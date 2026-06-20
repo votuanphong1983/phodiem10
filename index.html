@@ -130,6 +130,14 @@
         <option value="2">Nhóm 2 điểm</option>
         <option value="5">Nhóm 5 điểm</option>
       </select>
+      <label style="margin-left:14px; font-size:13px; color:var(--ink-muted);">
+        <input type="checkbox" id="excludePassedSpecialized" style="transform:translateY(1px);">
+        Loại bỏ các thí sinh đã đỗ lớp chuyên hoặc tích hợp
+      </label>
+      <label style="margin-left:14px; font-size:13px; color:var(--ink-muted);">
+        Điểm chuẩn tổng 4 môn:
+        <input id="passingCutoff" type="number" min="0" max="40" step="0.25" value="24" style="width:84px; margin-left:6px;">
+      </label>
     </div>
     <div class="chart-wrap"><canvas id="chartTotal" role="img" aria-label="Biểu đồ cột phân bố điểm tổng"></canvas></div>
     
@@ -166,6 +174,18 @@ const SUBJECT_LABELS = {toan:'Toán', van:'Văn', anh:'Anh', monchuyen:'Môn chu
 
 let chartTotal = null;
 let chartSubjects = null;
+
+function getPassingCutoff(){
+  const cutoff = Number(document.getElementById('passingCutoff')?.value);
+  if(Number.isFinite(cutoff) && cutoff >= 0) return cutoff;
+  return 24;
+}
+function isPassedSpecializedOrIntegrated(row, cutoff){
+  if(row.monchuyen===null || row.monchuyen===undefined || isNaN(row.monchuyen)) return false;
+  if(row.monchuyen < 2) return false;
+  const tong4 = row.tong + row.monchuyen;
+  return tong4 >= cutoff;
+}
 
 function mean(arr){ return arr.reduce((a,b)=>a+b,0) / arr.length; }
 function median(arr){
@@ -211,7 +231,13 @@ function renderLedger(rows){
 
 function renderCharts(rows){
   const tot = rows.map(r=>r.tong);
-  if(tot.length === 0) return;
+  if(tot.length === 0) {
+    if (chartTotal) { chartTotal.destroy(); chartTotal = null; }
+    if (chartSubjects) { chartSubjects.destroy(); chartSubjects = null; }
+    const legendEl = document.getElementById('subjectLegend');
+    if(legendEl) legendEl.innerHTML = '';
+    return;
+  }
   const bucketSize = Number(document.getElementById('bucketMode')?.value || 1);
   const maxTot = Math.max(...tot);
   const top = Math.ceil(maxTot / bucketSize) * bucketSize;
@@ -292,6 +318,14 @@ function renderTable(rows){
   ).join('');
 }
 
+function getFilteredRows(){
+  const rows = window.__allRows || [];
+  const excludePassed = document.getElementById('excludePassedSpecialized')?.checked;
+  if(!excludePassed) return rows;
+  const cutoff = getPassingCutoff();
+  return rows.filter(r => !isPassedSpecializedOrIntegrated(r, cutoff));
+}
+
 function renderAll(rows){
   window.__currentRows = rows;
   const sealEl = document.getElementById('sealN');
@@ -299,6 +333,10 @@ function renderAll(rows){
   renderLedger(rows);
   renderCharts(rows);
   renderTable(rows);
+}
+function applyFilters(){
+  const rows = getFilteredRows();
+  renderAll(rows);
 }
 function parseAndData(csvString, sourceName) {
   Papa.parse(csvString, {
@@ -311,7 +349,9 @@ function parseAndData(csvString, sourceName) {
         }
         const norm = res.data.map(row=>{
           const keyMap = {};
-          Object.keys(row).forEach(k=> keyMap[k.trim().toLowerCase()] = row[k]);
+          Object.keys(row).forEach(k=> {
+            keyMap[k.trim().toLowerCase()] = row[k];
+          });
           const sbd = keyMap['sbd'];
           const toan = parseFloat(keyMap['toan']);
           const van = parseFloat(keyMap['van']);
@@ -327,7 +367,8 @@ function parseAndData(csvString, sourceName) {
         
         document.getElementById('fileError').style.display = 'none';
         document.getElementById('fileName').textContent = sourceName + ' (' + norm.length + ' dòng)';
-        renderAll(norm);
+        window.__allRows = norm;
+        applyFilters();
       }catch(err){
         showError("Lỗi xử lý dữ liệu: " + err.message);
       }
@@ -385,9 +426,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.addEventListener('change', function(e){
-    if(e.target && e.target.id === 'bucketMode'){
-      const rows = window.__currentRows || [];
-      if(rows.length > 0) renderCharts(rows);
+    if(e.target && (e.target.id === 'bucketMode' || e.target.id === 'excludePassedSpecialized' || e.target.id === 'passingCutoff')){
+      applyFilters();
+    }
+  });
+
+  document.addEventListener('input', function(e){
+    if(e.target && e.target.id === 'passingCutoff'){
+      applyFilters();
     }
   });
 });
