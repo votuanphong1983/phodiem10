@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phổ điểm tuyển sinh 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#faf8f3;
+    --ink:#211d17;
+    --ink-muted:#756b5c;
+    --rule:#ddd4c2;
+    --accent:#8c2f39;
+    --accent-soft:#f1e3df;
+    --blue:#2b5c8a;
+    --green:#3e7a4f;
+    --ochre:#b5651d;
+    --purple:#6b4f9e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .report{max-width:880px; margin:0 auto; padding:48px 24px 80px;}
+
+  header.report-head{
+    border-bottom:1px solid var(--rule); padding-bottom:28px; margin-bottom:8px;
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap;
+  }
+  .eyebrow{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-muted); margin:0 0 10px;}
+  .report-head h1{font-family:'Newsreader',serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; margin:0 0 6px;}
+  .report-head p.sub{color:var(--ink-muted); font-size:15px; margin:0; max-width:46ch;}
+
+  .seal{
+    width:96px; height:96px; border-radius:50%; border:1.5px dashed var(--accent);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--accent); transform:rotate(-7deg); flex-shrink:0; text-align:center;
+  }
+  .seal .n{font-family:'Newsreader',serif; font-size:26px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums;}
+  .seal .label{font-size:8.5px; letter-spacing:.07em; text-transform:uppercase; margin-top:3px; line-height:1.3;}
+
+  .upload-row{
+    display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-muted);
+    margin:18px 0 0;
+  }
+  .upload-row label.btn{
+    border:1px solid var(--rule); border-radius:4px; padding:7px 12px; cursor:pointer;
+    background:#fff; color:var(--ink); font-size:13px;
+  }
+  .upload-row label.btn:hover{border-color:var(--accent); color:var(--accent);}
+  #fileInput{display:none;}
+  #fileName{color:var(--ink-muted);}
+  #fileError{color:var(--accent); display:none;}
+
+  .ledger{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); margin:32px 0;
+  }
+  .ledger > div{padding:18px 16px; border-left:1px solid var(--rule);}
+  .ledger > div:first-child{border-left:none;}
+  .ledger .label{font-size:12px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;}
+  .ledger .value{font-family:'Newsreader',serif; font-size:26px; font-weight:600; font-variant-numeric:tabular-nums;}
+  .ledger .note{font-size:12px; color:var(--ink-muted); margin-top:5px;}
+
+  section.block{margin:44px 0;}
+  section.block h2{font-family:'Newsreader',serif; font-weight:600; font-size:19px; margin:0 0 4px;}
+  section.block .desc{font-size:13px; color:var(--ink-muted); margin:0 0 18px;}
+
+  .chart-wrap{position:relative; height:300px;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:18px; font-size:12px; color:var(--ink-muted); margin-bottom:10px;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:9px; height:9px; border-radius:2px; display:inline-block;}
+
+  details summary{cursor:pointer; font-size:13px; color:var(--accent); margin-bottom:14px;}
+  table.data{width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums;}
+  table.data th, table.data td{padding:8px 10px; border-bottom:1px solid var(--rule); text-align:right;}
+  table.data th:first-child, table.data td:first-child{text-align:left;}
+  table.data thead th{color:var(--ink-muted); font-weight:500; text-transform:uppercase; font-size:10.5px; letter-spacing:.05em; position:sticky; top:0; background:#fff;}
+  .table-scroll{max-height:360px; overflow:auto; border:1px solid var(--rule); border-radius:4px;}
+
+  footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--rule); font-size:12px; color:var(--ink-muted);}
+
+  @media (max-width:640px){
+    .ledger{grid-template-columns:repeat(2,1fr);}
+    .ledger > div:nth-child(3){border-left:none;}
+  }
+</style>
+</head>
+<body>
+<div class="report">
+
+  <header class="report-head">
+    <div>
+      <p class="eyebrow">Báo cáo phân tích</p>
+      <h1>Phổ điểm tuyển sinh 10</h1>
+      <p class="sub">Phân bố điểm thi ba môn Toán, Văn, Ngoại ngữ và điểm xét tuyển tổng, dựng từ dữ liệu điểm thi.</p>
+      <div class="upload-row">
+        <label class="btn" for="fileInput">Nạp file CSV khác</label>
+        <input type="file" id="fileInput" accept=".csv">
+        <span id="fileName">Đang tải dữ liệu tự động...</span>
+        <span id="fileError">Lỗi kết nối hoặc không tìm thấy `diem_thi.csv`. Yêu cầu cột: SBD, Toan, Van, Anh</span>
+      </div>
+    </div>
+    <div class="seal">
+      <div class="n" id="sealN">0</div>
+      <div class="label">thí sinh<br>đã phân tích</div>
+    </div>
+  </header>
+
+  <div class="ledger" id="ledger"></div>
+
+  <section class="block">
+    <h2>Phân bố điểm xét tuyển (tổng 3 môn)</h2>
+    <p class="desc">Số thí sinh theo từng khoảng điểm.</p>
+    
+    <div style="margin-bottom:12px">
+      <label><b>Hiển thị phổ điểm:</b></label>
+      <select id="bucketMode">
+        <option value="0.25">Chi tiết 0.25 điểm</option>
+        <option value="0.5">Chi tiết 0.5 điểm</option>
+        <option value="1" selected>Theo 1 điểm</option>
+        <option value="2">Nhóm 2 điểm</option>
+        <option value="5">Nhóm 5 điểm</option>
+      </select>
+    </div>
+    <div class="chart-wrap"><canvas id="chartTotal" role="img" aria-label="Biểu đồ cột phân bố điểm tổng"></canvas></div>
+    
+  </section>
+
+  <section class="block">
+    <h2>So sánh phổ điểm theo môn</h2>
+    <p class="desc">Số thí sinh theo từng khoảng 1 điểm, thang điểm 10.</p>
+    <div class="legend" id="subjectLegend"></div>
+    <div class="chart-wrap"><canvas id="chartSubjects" role="img" aria-label="Biểu đồ cột so sánh phổ điểm các môn"></canvas></div>
+  </section>
+
+  <section class="block">
+    <details>
+      <summary>Xem bảng dữ liệu chi tiết</summary>
+      <div class="table-scroll">
+        <table class="data">
+          <thead><tr><th>SBD</th><th>Toán</th><th>Văn</th><th>Anh</th><th>Môn chuyên</th><th>Tổng</th></tr></thead>
+          <tbody id="dataBody"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    Tự động đồng bộ từ file `diem_thi.csv` — Bạn vẫn có thể nạp file CSV bất kỳ lúc nào để phân tích nhanh.
+  </footer>
+
+</div>
+
+<script>
+const SUBJECT_COLORS = {toan:'#2b5c8a', van:'#3e7a4f', anh:'#b5651d', monchuyen:'#6b4f9e'};
+const SUBJECT_LABELS = {toan:'Toán', van:'Văn', anh:'Anh', monchuyen:'Môn chuyên'};
+
+let chartTotal = null;
+let chartSubjects = null;
+
+function mean(arr){ return arr.reduce((a,b)=>a+b,0) / arr.length; }
+function median(arr){
+  const s = [...arr].sort((a,b)=>a-b);
+  const mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+function std(arr){
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0) / arr.length);
+}
+function histogram(values, edges){
+  const counts = new Array(edges.length-1).fill(0);
+  values.forEach(v=>{
+    for(let i=0;i<edges.length-1;i++){
+      if(v>=edges[i] && (v<edges[i+1] || (i===edges.length-2 && v<=edges[i+1]))){ counts[i]++; break; }
+    }
+  });
+  return counts;
+}
+
+function renderLedger(rows){
+  const subs = ['toan','van','anh'];
+  const ledger = document.getElementById('ledger');
+  if(!ledger) return;
+  ledger.innerHTML = '';
+  subs.forEach(s=>{
+    const vals = rows.map(r=>r[s]);
+    const m = mean(vals), md = median(vals);
+    const below5 = vals.filter(v=>v<5).length;
+    const pct = Math.round(below5/vals.length*100);
+    ledger.insertAdjacentHTML('beforeend',
+      '<div><p class="label">'+SUBJECT_LABELS[s]+' (TB)</p>'+
+      '<p class="value">'+m.toFixed(2)+'</p>'+
+      '<p class="note">Trung vị '+md.toFixed(2)+' · dưới 5đ: '+pct+'%</p></div>');
+  });
+  const tot = rows.map(r=>r.tong);
+  ledger.insertAdjacentHTML('beforeend',
+    '<div><p class="label">Tổng điểm (TB)</p>'+
+    '<p class="value">'+mean(tot).toFixed(2)+'</p>'+
+    '<p class="note">Trung vị '+median(tot).toFixed(2)+' · độ lệch chuẩn '+std(tot).toFixed(2)+'</p></div>');
+}
+
+function renderCharts(rows){
+  const tot = rows.map(r=>r.tong);
+  if(tot.length === 0) return;
+  const bucketSize = Number(document.getElementById('bucketMode')?.value || 1);
+  const maxTot = Math.max(...tot);
+  const top = Math.ceil(maxTot / bucketSize) * bucketSize;
+
+  const edges = [];
+  for(let v=0; v<=top + bucketSize; v+=bucketSize){
+    edges.push(Number(v.toFixed(2)));
+  }
+
+  const labels = edges.slice(0,-1).map((e,i)=>{
+    if(bucketSize < 1){
+      return e.toFixed(2);
+    }
+    return bucketSize === 1 ? String(e) : e + '-' + edges[i+1];
+  });
+
+  const counts = histogram(tot, edges);
+
+  const ctxTotal = document.getElementById('chartTotal');
+  if(ctxTotal) {
+    if (chartTotal) chartTotal.destroy();
+    chartTotal = new Chart(ctxTotal, {
+      type:'bar',
+      data:{ labels, datasets:[{ label:'Số thí sinh', data:counts, backgroundColor:'#8c2f39', borderRadius:3 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ ticks:{ autoSkip:false, maxRotation:45, font:{size:11} }, grid:{display:false} },
+          y:{ beginAtZero:true, ticks:{ precision:0 }, title:{ display:true, text:'Số thí sinh', font:{size:12} } }
+        }
+      }
+    });
+  }
+
+  const subjEdges = [0,1,2,3,4,5,6,7,8,9,10];
+  const subjLabels = subjEdges.slice(0,-1).map((e,i)=> e+'-'+subjEdges[i+1]);
+  const present = ['toan','van','anh'].concat(
+    rows.some(r=>r.monchuyen!==null && r.monchuyen!==undefined && !isNaN(r.monchuyen)) ? ['monchuyen'] : []
+  );
+  const datasets = present.map(s=>({
+    label: SUBJECT_LABELS[s],
+    data: histogram(rows.map(r=>r[s]).filter(v=>v!==null && v!==undefined && !isNaN(v)), subjEdges),
+    backgroundColor: SUBJECT_COLORS[s]
+  }));
+
+  const legendEl = document.getElementById('subjectLegend');
+  if(legendEl) {
+    legendEl.innerHTML = present.map(s=>
+      '<span><span class="dot" style="background:'+SUBJECT_COLORS[s]+'"></span>'+SUBJECT_LABELS[s]+'</span>').join('');
+  }
+
+  const ctxSubjects = document.getElementById('chartSubjects');
+  if(ctxSubjects) {
+    if (chartSubjects) chartSubjects.destroy();
+    chartSubjects = new Chart(ctxSubjects, {
+      type:'bar',
+      data:{ labels: subjLabels, datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ ticks:{ autoSkip:false, font:{size:11} }, grid:{display:false} },
+          y:{ beginAtZero:true, ticks:{ precision:0 }, title:{ display:true, text:'Số thí sinh', font:{size:12} } }
+        }
+      }
+    });
+  }
+}
+
+function renderTable(rows){
+  const body = document.getElementById('dataBody');
+  if(!body) return;
+  body.innerHTML = rows.map(r=>
+    '<tr><td>'+r.sbd+'</td><td>'+r.toan.toFixed(2)+'</td><td>'+r.van.toFixed(2)+'</td><td>'+r.anh.toFixed(2)+'</td>'+
+    '<td>'+(r.monchuyen!==null && r.monchuyen!==undefined && !isNaN(r.monchuyen) ? Number(r.monchuyen).toFixed(2) : '—')+'</td>'+
+    '<td>'+r.tong.toFixed(2)+'</td></tr>'
+  ).join('');
+}
+
+function renderAll(rows){
+  window.__currentRows = rows;
+  const sealEl = document.getElementById('sealN');
+  if(sealEl) sealEl.textContent = rows.length;
+  renderLedger(rows);
+  renderCharts(rows);
+  renderTable(rows);
+}
+function parseAndData(csvString, sourceName) {
+  Papa.parse(csvString, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(res){
+      try{
+        if(res.errors && res.errors.length > 0) {
+          console.warn("PapaParse cảnh báo:", res.errors);
+        }
+        const norm = res.data.map(row=>{
+          const keyMap = {};
+          Object.keys(row).forEach(k=> keyMap[k.trim().toLowerCase()] = row[k]);
+          const sbd = keyMap['sbd'];
+          const toan = parseFloat(keyMap['toan']);
+          const van = parseFloat(keyMap['van']);
+          const anh = parseFloat(keyMap['anh']);
+          const tong = toan + van + anh;
+          const mc = keyMap['monchuyen'];
+          const monchuyen = (mc===undefined || mc===null || mc==='') ? null : parseFloat(mc);
+          if(sbd===undefined || isNaN(toan) || isNaN(van) || isNaN(anh) || isNaN(tong)) return null;
+          return {sbd, toan, van, anh, monchuyen, tong};
+        }).filter(r=>r!==null);
+        
+        if(norm.length===0) throw new Error('Không có dòng dữ liệu nào hợp lệ hoặc sai tên cột (SBD, Toan, Van, Anh).');
+        
+        document.getElementById('fileError').style.display = 'none';
+        document.getElementById('fileName').textContent = sourceName + ' (' + norm.length + ' dòng)';
+        renderAll(norm);
+      }catch(err){
+        showError("Lỗi xử lý dữ liệu: " + err.message);
+      }
+    },
+    error: function(err){
+      showError("Lỗi PapaParse: " + err.message);
+    }
+  });
+}
+
+function showError(msg) {
+  console.error(msg);
+  const errEl = document.getElementById('fileError');
+  const nameEl = document.getElementById('fileName');
+  if(nameEl) nameEl.textContent = "Thất bại";
+  if(errEl) {
+    errEl.textContent = msg;
+    errEl.style.display = 'inline';
+  }
+}
+
+// Thực thi fetch ngay khi trình duyệt đọc đến thẻ script
+(function loadDataImmediately() {
+  fetch('diem_thi.csv')
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP status ' + response.status + ' - Không tìm thấy file diem_thi.csv cục bộ.');
+      return response.text();
+    })
+    .then(csvText => {
+      parseAndData(csvText, 'diem_thi.csv');
+    })
+    .catch(err => {
+      // Bắt lỗi CORS hoặc lỗi truyền tải
+      if (window.location.protocol === 'file:') {
+        showError("Lỗi CORS: Trình duyệt chặn đọc file trực tiếp từ ổ cứng (file:///), vui lòng chạy qua Local Web Server (Live Server, Python, v.v.)");
+      } else {
+        showError("Không thể tải file: " + err.message);
+      }
+    });
+})();
+
+// Xử lý sự kiện chọn file thủ công (Luôn chạy tốt kể cả khi mở bằng file:///)
+document.addEventListener('DOMContentLoaded', () => {
+  const inputEl = document.getElementById('fileInput');
+  if(inputEl) {
+    inputEl.addEventListener('change', function(e){
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        parseAndData(evt.target.result, file.name);
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  document.addEventListener('change', function(e){
+    if(e.target && e.target.id === 'bucketMode'){
+      const rows = window.__currentRows || [];
+      if(rows.length > 0) renderCharts(rows);
+    }
+  });
+});
+</script>
+</body>
+</html>
